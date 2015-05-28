@@ -26,7 +26,7 @@
 	var time = Date.now || function() {
 		return +new Date();
 	};
-	var desiredFrames = 60;
+	var desiredFrames = 80;
 	var millisecondsPerSecond = 1000;
 	var running = {};
 	var counter = 1;
@@ -63,7 +63,7 @@
 				};
 			}
 
-			var TARGET_FPS = 60;
+			var TARGET_FPS = 80;
 			var requests = {};
 			var requestCount = 0;
 			var rafHandle = 1;
@@ -236,4 +236,3 @@
 		}
 	};
 })(this);
-

@@ -66,7 +66,7 @@ var Scroller;
 				provided that another scrolling action has not begun. Used to know
 				when to fade out a scrollbar. */
 			scrollingComplete: NOOP,
-			
+
 			/** This configures the amount of change applied to deceleration when reaching boundaries  **/
             penetrationDeceleration : 0.03,
 
@@ -431,94 +431,6 @@ var Scroller;
 
 
 		/**
-		 * Zooms to the given level. Supports optional animation. Zooms
-		 * the center when no coordinates are given.
-		 *
-		 * @param level {Number} Level to zoom to
-		 * @param animate {Boolean ? false} Whether to use animation
-		 * @param originLeft {Number ? null} Zoom in at given left coordinate
-		 * @param originTop {Number ? null} Zoom in at given top coordinate
-		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
-		 */
-		zoomTo: function(level, animate, originLeft, originTop, callback) {
-
-			var self = this;
-
-			if (!self.options.zooming) {
-				throw new Error("Zooming is not enabled!");
-			}
-
-			// Add callback if exists
-			if(callback) {
-				self.__zoomComplete = callback;
-			}
-
-			// Stop deceleration
-			if (self.__isDecelerating) {
-				core.effect.Animate.stop(self.__isDecelerating);
-				self.__isDecelerating = false;
-			}
-
-			var oldLevel = self.__zoomLevel;
-
-			// Normalize input origin to center of viewport if not defined
-			if (originLeft == null) {
-				originLeft = self.__clientWidth / 2;
-			}
-
-			if (originTop == null) {
-				originTop = self.__clientHeight / 2;
-			}
-
-			// Limit level according to configuration
-			level = Math.max(Math.min(level, self.options.maxZoom), self.options.minZoom);
-
-			// Recompute maximum values while temporary tweaking maximum scroll ranges
-			self.__computeScrollMax(level);
-
-			// Recompute left and top coordinates based on new zoom level
-			var left = ((originLeft + self.__scrollLeft) * level / oldLevel) - originLeft;
-			var top = ((originTop + self.__scrollTop) * level / oldLevel) - originTop;
-
-			// Limit x-axis
-			if (left > self.__maxScrollLeft) {
-				left = self.__maxScrollLeft;
-			} else if (left < 0) {
-				left = 0;
-			}
-
-			// Limit y-axis
-			if (top > self.__maxScrollTop) {
-				top = self.__maxScrollTop;
-			} else if (top < 0) {
-				top = 0;
-			}
-
-			// Push values out
-			self.__publish(left, top, level, animate);
-
-		},
-
-
-		/**
-		 * Zooms the content by the given factor.
-		 *
-		 * @param factor {Number} Zoom by given factor
-		 * @param animate {Boolean ? false} Whether to use animation
-		 * @param originLeft {Number ? 0} Zoom in at given left coordinate
-		 * @param originTop {Number ? 0} Zoom in at given top coordinate
-		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
-		 */
-		zoomBy: function(factor, animate, originLeft, originTop, callback) {
-
-			var self = this;
-
-			self.zoomTo(self.__zoomLevel * factor, animate, originLeft, originTop, callback);
-
-		},
-
-
-		/**
 		 * Scrolls to the given position. Respect limitations and snapping automatically.
 		 *
 		 * @param left {Number?null} Horizontal scroll position, keeps current if value is <code>null</code>
@@ -534,26 +446,6 @@ var Scroller;
 			if (self.__isDecelerating) {
 				core.effect.Animate.stop(self.__isDecelerating);
 				self.__isDecelerating = false;
-			}
-
-			// Correct coordinates based on new zoom level
-			if (zoom != null && zoom !== self.__zoomLevel) {
-
-				if (!self.options.zooming) {
-					throw new Error("Zooming is not enabled!");
-				}
-
-				left *= zoom;
-				top *= zoom;
-
-				// Recompute maximum values while temporary tweaking maximum scroll ranges
-				self.__computeScrollMax(zoom);
-
-			} else {
-
-				// Keep zoom when not defined
-				zoom = self.__zoomLevel;
-
 			}
 
 			if (!self.options.scrollingX) {
@@ -1061,15 +953,12 @@ var Scroller;
 				// Keep scheduled positions for scrollBy/zoomBy functionality
 				self.__scheduledLeft = left;
 				self.__scheduledTop = top;
-				self.__scheduledZoom = zoom;
 
 				var oldLeft = self.__scrollLeft;
 				var oldTop = self.__scrollTop;
-				var oldZoom = self.__zoomLevel;
 
 				var diffLeft = left - oldLeft;
 				var diffTop = top - oldTop;
-				var diffZoom = zoom - oldZoom;
 
 				var step = function(percent, now, render) {
 
@@ -1077,11 +966,10 @@ var Scroller;
 
 						self.__scrollLeft = oldLeft + (diffLeft * percent);
 						self.__scrollTop = oldTop + (diffTop * percent);
-						self.__zoomLevel = oldZoom + (diffZoom * percent);
 
 						// Push values out
 						if (self.__callback) {
-							self.__callback(self.__scrollLeft, self.__scrollTop, self.__zoomLevel);
+							self.__callback(self.__scrollLeft, self.__scrollTop);
 						}
 
 					}
@@ -1098,14 +986,6 @@ var Scroller;
 					if (self.__didDecelerationComplete || wasFinished) {
 						self.options.scrollingComplete();
 					}
-
-					if (self.options.zooming) {
-						self.__computeScrollMax();
-						if(self.__zoomComplete) {
-							self.__zoomComplete();
-							self.__zoomComplete = null;
-						}
-					}
 				};
 
 				// When continuing based on previous animation we choose an ease-out animation instead of ease-in-out
@@ -1115,20 +995,10 @@ var Scroller;
 
 				self.__scheduledLeft = self.__scrollLeft = left;
 				self.__scheduledTop = self.__scrollTop = top;
-				self.__scheduledZoom = self.__zoomLevel = zoom;
 
 				// Push values out
 				if (self.__callback) {
-					self.__callback(left, top, zoom);
-				}
-
-				// Fix max scroll ranges
-				if (self.options.zooming) {
-					self.__computeScrollMax();
-					if(self.__zoomComplete) {
-						self.__zoomComplete();
-						self.__zoomComplete = null;
-					}
+					self.__callback(left, top);
 				}
 			}
 		},
@@ -1141,12 +1011,8 @@ var Scroller;
 
 			var self = this;
 
-			if (zoomLevel == null) {
-				zoomLevel = self.__zoomLevel;
-			}
-
-			self.__maxScrollLeft = Math.max((self.__contentWidth * zoomLevel) - self.__clientWidth, 0);
-			self.__maxScrollTop = Math.max((self.__contentHeight * zoomLevel) - self.__clientHeight, 0);
+			self.__maxScrollLeft = Math.max(self.__contentWidth - self.__clientWidth, 0);
+			self.__maxScrollTop = Math.max(self.__contentHeight - self.__clientHeight, 0);
 
 		},
 
@@ -1307,8 +1173,8 @@ var Scroller;
 				var scrollOutsideY = 0;
 
 				// This configures the amount of change applied to deceleration/acceleration when reaching boundaries
-				var penetrationDeceleration = self.options.penetrationDeceleration; 
-				var penetrationAcceleration = self.options.penetrationAcceleration; 
+				var penetrationDeceleration = self.options.penetrationDeceleration;
+				var penetrationAcceleration = self.options.penetrationAcceleration;
 
 				// Check limits
 				if (scrollLeft < self.__minDecelerationScrollLeft) {
